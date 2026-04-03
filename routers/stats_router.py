@@ -22,7 +22,7 @@ async def get_stats(
     """Get dashboard statistics."""
     # Totals
     total_dosen = (await db.execute(select(func.count()).select_from(Dosen))).scalar() or 0
-    total_prodi = (await db.execute(select(func.count()).select_from(ProgramStudi))).scalar() or 0
+    total_program_studi = (await db.execute(select(func.count()).select_from(ProgramStudi))).scalar() or 0
     total_pt = (await db.execute(select(func.count()).select_from(PerguruanTinggi))).scalar() or 0
 
     # By gender
@@ -62,6 +62,7 @@ async def get_stats(
         .order_by(desc(func.count(Dosen.id)))
     )
     by_rumpun = {r[0]: r[1] for r in rumpun_q.all()}
+    total_rumpun = len(by_rumpun)
 
     # By status
     status_q = await db.execute(
@@ -83,7 +84,9 @@ async def get_stats(
 
     return {
         "total_dosen": total_dosen,
-        "total_prodi": total_prodi,
+        "total_prodi": total_program_studi,
+        "total_program_studi": total_program_studi,
+        "total_rumpun": total_rumpun,
         "total_pt": total_pt,
         "by_gender": by_gender,
         "by_jabatan": by_jabatan,

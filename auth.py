@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
 from database import get_db
-from models import User, UserSession, UserActivity
+from models import ScrapeJob, User, UserSession, UserActivity
 
 settings = get_settings()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -131,6 +131,30 @@ async def _invalidate_session(db: AsyncSession, session: UserSession, user_id: i
     await db.commit()
 
 
+async def _get_running_scrape_owner(
+    db: AsyncSession,
+    exclude_user_id: int = None,
+) -> Optional[User]:
+    """Treat a running scrape job as an active lock owner even after logout."""
+    result = await db.execute(
+        select(ScrapeJob)
+        .where(and_(ScrapeJob.status == "running", ScrapeJob.user_id.isnot(None)))
+        .order_by(ScrapeJob.started_at.desc())
+    )
+    running_jobs = result.scalars().all()
+
+    for job in running_jobs:
+        if exclude_user_id and job.user_id == exclude_user_id:
+            continue
+
+        user_result = await db.execute(select(User).where(User.id == job.user_id))
+        lock_user = user_result.scalar_one_or_none()
+        if lock_user and lock_user.role != "admin":
+            return lock_user
+
+    return None
+
+
 async def get_admin_user(
     user: User = Depends(get_current_user),
 ) -> User:
@@ -148,6 +172,10 @@ async def check_single_user_lock(db: AsyncSession, exclude_user_id: int = None) 
     Check if any user (non-admin) currently has an active session.
     Returns the active user if locked, None if free.
     """
+    running_lock_owner = await _get_running_scrape_owner(db, exclude_user_id)
+    if running_lock_owner:
+        return running_lock_owner
+
     query = select(UserSession).where(UserSession.is_active == True)
 
     result = await db.execute(query)

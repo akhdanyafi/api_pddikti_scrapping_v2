@@ -9,12 +9,12 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func, or_, and_, desc, asc
+from sqlalchemy import select, func, or_, and_, desc, asc, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import get_current_user, log_activity
 from database import get_db
-from models import Dosen, PerguruanTinggi, ProgramStudi, User
+from models import Dosen, PerguruanTinggi, ProgramStudi, ScrapeJob, User
 
 router = APIRouter(prefix="/api/dosen", tags=["dosen"])
 
@@ -135,6 +135,50 @@ async def list_dosen(
             "per_page": per_page,
             "total": total,
             "total_pages": (total + per_page - 1) // per_page if total else 0,
+        },
+    }
+
+
+@router.delete("/purge")
+async def purge_scraped_data(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete all stored dosen scraping results while keeping job history intact."""
+    running_job = await db.execute(
+        select(ScrapeJob).where(ScrapeJob.status == "running")
+    )
+    if running_job.scalar_one_or_none():
+        raise HTTPException(
+            status_code=409,
+            detail="Masih ada proses scraping yang berjalan. Stop dulu sebelum menghapus hasil scraping."
+        )
+
+    total_dosen = (await db.execute(select(func.count()).select_from(Dosen))).scalar() or 0
+    total_prodi = (await db.execute(select(func.count()).select_from(ProgramStudi))).scalar() or 0
+    total_pt = (await db.execute(select(func.count()).select_from(PerguruanTinggi))).scalar() or 0
+
+    await db.execute(delete(Dosen))
+    await db.execute(delete(ProgramStudi))
+    await db.execute(delete(PerguruanTinggi))
+    await db.commit()
+
+    client_ip = request.client.host if request.client else None
+    await log_activity(
+        db,
+        user.id,
+        "purge_scrape_data",
+        f"Menghapus hasil scraping: {total_dosen} dosen, {total_prodi} prodi, {total_pt} PT",
+        client_ip,
+    )
+
+    return {
+        "message": "Semua hasil scraping di database berhasil dihapus",
+        "deleted": {
+            "dosen": total_dosen,
+            "program_studi": total_prodi,
+            "perguruan_tinggi": total_pt,
         },
     }
 
