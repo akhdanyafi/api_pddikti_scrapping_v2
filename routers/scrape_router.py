@@ -16,7 +16,7 @@ from auth import get_current_user, log_activity
 from database import get_db, AsyncSessionLocal
 from models import ScrapeJob, ScrapeLog, User
 
-router = APIRouter(prefix="/api/scrape", tags=["scrape"])
+router = APIRouter(prefix="/api_v2/scrape", tags=["scrape"])
 
 # Active WebSocket connections per job
 active_connections: dict[int, list[WebSocket]] = {}
@@ -27,6 +27,7 @@ running_tasks: dict[int, asyncio.Task] = {}
 class ScrapeStartRequest(BaseModel):
     prodi_filter: List[str]
     semesters: Optional[List[str]] = None
+    pt_filter: Optional[str] = None
 
 
 @router.post("/start")
@@ -63,7 +64,7 @@ async def start_scrape(
 
     # Start scraping in background
     from services.scraper import run_scraping_job
-    task = asyncio.create_task(run_scraping_job(job.id, req.prodi_filter, req.semesters))
+    task = asyncio.create_task(run_scraping_job(job.id, req.prodi_filter, req.semesters, req.pt_filter))
     running_tasks[job.id] = task
 
     client_ip = request.client.host if request.client else None

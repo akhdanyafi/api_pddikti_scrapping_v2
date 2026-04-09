@@ -19,7 +19,7 @@ from auth import (
 from database import get_db
 from models import User, UserSession
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(prefix="/api_v2/auth", tags=["auth"])
 
 
 # ── Schemas ──

@@ -16,7 +16,7 @@ from auth import get_current_user, log_activity
 from database import get_db
 from models import Dosen, PerguruanTinggi, ProgramStudi, ScrapeJob, User
 
-router = APIRouter(prefix="/api/dosen", tags=["dosen"])
+router = APIRouter(prefix="/api_v2/dosen", tags=["dosen"])
 
 
 @router.get("")
@@ -30,6 +30,7 @@ async def list_dosen(
     jenis_kelamin: Optional[str] = Query(None),
     pendidikan: Optional[str] = Query(None),
     status_aktivitas: Optional[str] = Query(None, alias="status"),
+    status_ikatan_kerja: Optional[str] = Query(None, alias="ikatan_kerja"),
     pt: Optional[str] = Query(None),
     sort_by: str = Query("nama"),
     sort_order: str = Query("asc"),
@@ -61,6 +62,8 @@ async def list_dosen(
         conditions.append(Dosen.pendidikan_terakhir == pendidikan)
     if status_aktivitas:
         conditions.append(Dosen.status_aktivitas == status_aktivitas)
+    if status_ikatan_kerja:
+        conditions.append(Dosen.status_ikatan_kerja == status_ikatan_kerja)
 
     if conditions:
         query = query.where(and_(*conditions))
@@ -237,12 +240,34 @@ async def get_filter_options(
     )
     pt_options = [{"value": r[0], "count": r[1]} for r in pt_q.all()]
 
+    # Status ikatan kerja
+    ikatan_q = await db.execute(
+        select(Dosen.status_ikatan_kerja, func.count(Dosen.id))
+        .where(Dosen.status_ikatan_kerja.isnot(None))
+        .where(Dosen.status_ikatan_kerja != "")
+        .group_by(Dosen.status_ikatan_kerja)
+        .order_by(desc(func.count(Dosen.id)))
+    )
+    ikatan_options = [{"value": r[0], "count": r[1]} for r in ikatan_q.all()]
+
+    # Status aktivitas
+    status_q = await db.execute(
+        select(Dosen.status_aktivitas, func.count(Dosen.id))
+        .where(Dosen.status_aktivitas.isnot(None))
+        .where(Dosen.status_aktivitas != "")
+        .group_by(Dosen.status_aktivitas)
+        .order_by(desc(func.count(Dosen.id)))
+    )
+    status_options = [{"value": r[0], "count": r[1]} for r in status_q.all()]
+
     return {
         "rumpun": rumpun_options,
         "jabatan": jabatan_options,
         "pendidikan": pendidikan_options,
         "jenis_kelamin": gender_options,
         "perguruan_tinggi": pt_options,
+        "status_ikatan_kerja": ikatan_options,
+        "status_aktivitas": status_options,
     }
 
 
@@ -255,6 +280,7 @@ async def export_excel(
     jenis_kelamin: Optional[str] = Query(None),
     pendidikan: Optional[str] = Query(None),
     status_aktivitas: Optional[str] = Query(None, alias="status"),
+    status_ikatan_kerja: Optional[str] = Query(None, alias="ikatan_kerja"),
     pt: Optional[str] = Query(None),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -277,6 +303,8 @@ async def export_excel(
         conditions.append(Dosen.pendidikan_terakhir == pendidikan)
     if status_aktivitas:
         conditions.append(Dosen.status_aktivitas == status_aktivitas)
+    if status_ikatan_kerja:
+        conditions.append(Dosen.status_ikatan_kerja == status_ikatan_kerja)
 
     if conditions:
         query = query.where(and_(*conditions))

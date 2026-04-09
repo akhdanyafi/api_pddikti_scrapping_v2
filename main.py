@@ -154,6 +154,6 @@ async def root():
     }
 
 
-@app.get("/api/health")
+@app.get("/api_v2/health")
 async def health():
     return {"status": "ok"}

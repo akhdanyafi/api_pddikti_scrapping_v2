@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Query
 
-router = APIRouter(prefix="/api/prodi", tags=["prodi"])
+router = APIRouter(prefix="/api_v2/prodi", tags=["prodi"])
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(os.path.dirname(SCRIPT_DIR), "data")

@@ -11,7 +11,7 @@ from auth import get_current_user
 from database import get_db
 from models import Dosen, PerguruanTinggi, ProgramStudi, ScrapeJob, User
 
-router = APIRouter(prefix="/api/stats", tags=["stats"])
+router = APIRouter(prefix="/api_v2/stats", tags=["stats"])
 
 
 @router.get("")

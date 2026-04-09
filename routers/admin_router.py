@@ -16,7 +16,7 @@ from auth import get_admin_user, hash_password, log_activity
 from database import get_db
 from models import User, UserSession, UserActivity
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter(prefix="/api_v2/admin", tags=["admin"])
 
 
 # ── Schemas ──
