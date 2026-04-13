@@ -3,10 +3,12 @@ PDDikti Dosen Explorer — FastAPI Main Entry Point
 """
 
 import asyncio
+import traceback
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from config import get_settings
 from database import init_db, AsyncSessionLocal
@@ -159,3 +161,16 @@ async def root():
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+# Global exception handler — return error detail instead of plain "Internal Server Error"
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    error_detail = str(exc)
+    tb = traceback.format_exc()
+    print(f"❌ Unhandled error on {request.method} {request.url.path}: {error_detail}")
+    print(tb)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal Server Error: {error_detail}"},
+    )
