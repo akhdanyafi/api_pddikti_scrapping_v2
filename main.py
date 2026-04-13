@@ -18,6 +18,7 @@ from routers.dosen_router import router as dosen_router
 from routers.scrape_router import router as scrape_router
 from routers.stats_router import router as stats_router
 from routers.prodi_router import router as prodi_router
+from routers.prodi_detail_router import router as prodi_detail_router
 
 settings = get_settings()
 
@@ -143,6 +144,7 @@ app.include_router(dosen_router)
 app.include_router(scrape_router)
 app.include_router(stats_router)
 app.include_router(prodi_router)
+app.include_router(prodi_detail_router)
 
 
 @app.get("/")

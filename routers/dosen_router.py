@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import get_current_user, get_current_user_for_download, log_activity
 from database import get_db
-from models import Dosen, PerguruanTinggi, ProgramStudi, ScrapeJob, User
+from models import Dosen, PerguruanTinggi, ProdiDetail, ProgramStudi, ScrapeJob, User
 
 router = APIRouter(prefix="/api_v2/dosen", tags=["dosen"])
 
@@ -160,9 +160,11 @@ async def purge_scraped_data(
 
     total_dosen = (await db.execute(select(func.count()).select_from(Dosen))).scalar() or 0
     total_prodi = (await db.execute(select(func.count()).select_from(ProgramStudi))).scalar() or 0
+    total_prodi_detail = (await db.execute(select(func.count()).select_from(ProdiDetail))).scalar() or 0
     total_pt = (await db.execute(select(func.count()).select_from(PerguruanTinggi))).scalar() or 0
 
     await db.execute(delete(Dosen))
+    await db.execute(delete(ProdiDetail))
     await db.execute(delete(ProgramStudi))
     await db.execute(delete(PerguruanTinggi))
     await db.commit()
@@ -172,7 +174,7 @@ async def purge_scraped_data(
         db,
         user.id,
         "purge_scrape_data",
-        f"Menghapus hasil scraping: {total_dosen} dosen, {total_prodi} prodi, {total_pt} PT",
+        f"Menghapus hasil scraping: {total_dosen} dosen, {total_prodi_detail} prodi detail, {total_prodi} prodi, {total_pt} PT",
         client_ip,
     )
 
@@ -180,6 +182,7 @@ async def purge_scraped_data(
         "message": "Semua hasil scraping di database berhasil dihapus",
         "deleted": {
             "dosen": total_dosen,
+            "prodi_detail": total_prodi_detail,
             "program_studi": total_prodi,
             "perguruan_tinggi": total_pt,
         },

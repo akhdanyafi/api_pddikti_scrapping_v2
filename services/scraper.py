@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import AsyncSessionLocal
 from models import (
-    Dosen, PerguruanTinggi, ProgramStudi, ScrapeJob, ScrapeLog
+    Dosen, PerguruanTinggi, ProdiDetail, ProgramStudi, ScrapeJob, ScrapeLog
 )
 
 # ── Configuration ──
@@ -425,10 +425,179 @@ async def run_scraping_job(
                 await db.commit()
                 return
 
-            # STEP 2: Fetch dosen homebase
+            # ── STEP 2: Scrape & save prodi detail + PT info ──
             await send_log(
                 job_id, "info",
-                f"📚 STEP 2: Mengambil dosen dari {len(resolved)} prodi × {len(semesters)} semester...",
+                f"📋 STEP 2: Mengambil detail {len(resolved)} prodi & info PT...",
+                db,
+            )
+
+            # Cache PT detail fetches to avoid duplicates
+            pt_detail_cache: dict[str, dict] = {}   # pt_name → detail dict
+            prodi_saved_count = 0
+
+            for i, prodi in enumerate(resolved, 1):
+                prodi_id = prodi["id"]
+                prodi_nama = prodi["nama"]
+                pt_name = prodi["pt"]
+                rumpun = prodi["rumpun"]
+
+                # Check if already in DB
+                existing_pd = await db.execute(
+                    select(ProdiDetail).where(ProdiDetail.pddikti_id == prodi_id)
+                )
+                if existing_pd.scalar_one_or_none():
+                    continue
+
+                # Fetch prodi detail from API
+                await asyncio.sleep(REQ_DELAY)
+                prodi_detail = await asyncio.to_thread(
+                    fetch_api, f"prodi/detail/{prodi_id}"
+                )
+                if not prodi_detail or not isinstance(prodi_detail, dict):
+                    prodi_detail = {}
+
+                # Parse prodi detail fields
+                kode_prodi = (prodi_detail.get("kode_prodi", "") or "").strip()
+                keterangan = (prodi_detail.get("status", "") or "").strip() or "Aktif"
+                akreditasi_val = (prodi_detail.get("akreditasi", "") or "").strip()
+                status_akreditasi_val = (prodi_detail.get("status_akreditasi", "") or "").strip()
+                provinsi_prodi = (prodi_detail.get("provinsi", "") or "").strip()
+
+                # Fetch PT detail (cached)
+                pt_info = pt_detail_cache.get(pt_name.upper())
+                if pt_info is None:
+                    pt_sp_id = (prodi_detail.get("id_sp", "") or "").strip()
+                    if pt_sp_id:
+                        await asyncio.sleep(REQ_DELAY)
+                        pt_raw = await asyncio.to_thread(
+                            fetch_api, f"pt/detail/{pt_sp_id}"
+                        )
+                        if pt_raw and isinstance(pt_raw, dict):
+                            pt_info = {
+                                "status_pt": (pt_raw.get("status_pt", "") or "").strip(),
+                                "kelompok": (pt_raw.get("kelompok", "") or "").strip(),
+                                "pembina": (pt_raw.get("pembina", "") or "").strip(),
+                                "provinsi": (pt_raw.get("provinsi_pt", "") or "").strip(),
+                                "akreditasi_pt": (pt_raw.get("akreditasi_pt", "") or "").strip(),
+                            }
+                        else:
+                            pt_info = {}
+                    else:
+                        pt_info = {}
+                    pt_detail_cache[pt_name.upper()] = pt_info
+
+                # Derive classification
+                status_pt = pt_info.get("status_pt", "").upper()
+                ptn_pts = "PTN" if "NEGERI" in status_pt or status_pt == "PTN" else "PTS"
+                kelompok = pt_info.get("kelompok", "").upper()
+                pembina = pt_info.get("pembina", "").upper()
+                ptkin = "PTKIN" if "PTKIN" in kelompok or "AGAMA" in pembina or "KEMENAG" in pembina else "NON PTKIN"
+                dikti = "DIKTIS" if ptkin == "PTKIN" else "DIKTI"
+                provinsi_final = pt_info.get("provinsi", "") or provinsi_prodi
+
+                # Count dosen for this prodi (from first semester with data)
+                jumlah_dosen = 0
+                for sem in semesters:
+                    await asyncio.sleep(REQ_DELAY)
+                    homebase = await asyncio.to_thread(
+                        fetch_api, f"dosen/homebase/{prodi_id}?semester={sem}"
+                    )
+                    if homebase and isinstance(homebase, list) and len(homebase) > 0:
+                        jumlah_dosen = len(homebase)
+                        prodi["semester_terakhir"] = sem
+                        break
+
+                # Get or create PT in DB
+                pt_result = await db.execute(
+                    select(PerguruanTinggi).where(PerguruanTinggi.nama == pt_name)
+                )
+                pt_obj = pt_result.scalar_one_or_none()
+                if not pt_obj:
+                    pt_obj = PerguruanTinggi(
+                        nama=pt_name,
+                        provinsi=provinsi_final,
+                        status_pt=ptn_pts,
+                        kelompok=ptkin,
+                        pembina=dikti,
+                    )
+                    db.add(pt_obj)
+                    await db.flush()
+                else:
+                    # Update PT classification if not yet set
+                    if not pt_obj.status_pt:
+                        pt_obj.status_pt = ptn_pts
+                    if not pt_obj.kelompok:
+                        pt_obj.kelompok = ptkin
+                    if not pt_obj.pembina:
+                        pt_obj.pembina = dikti
+                    if not pt_obj.provinsi:
+                        pt_obj.provinsi = provinsi_final
+
+                # Save ProdiDetail
+                pd_obj = ProdiDetail(
+                    pddikti_id=prodi_id,
+                    pt_id=pt_obj.id,
+                    nama_prodi=prodi_nama,
+                    rumpun=rumpun,
+                    jenjang=prodi.get("jenjang", ""),
+                    kode_prodi=kode_prodi,
+                    jumlah_dosen=jumlah_dosen,
+                    keterangan=keterangan,
+                    akreditasi=akreditasi_val,
+                    status_akreditasi=status_akreditasi_val or (
+                        "Belum Terakreditasi" if not akreditasi_val else "Terakreditasi"
+                    ),
+                    ptn_pts=ptn_pts,
+                    ptkin_non_ptkin=ptkin,
+                    dikti_diktis=dikti,
+                    provinsi=provinsi_final,
+                    semester_terakhir=prodi.get("semester_terakhir", ""),
+                )
+                db.add(pd_obj)
+                prodi_saved_count += 1
+
+                if prodi_saved_count % 25 == 0:
+                    await db.commit()
+                    await send_log(
+                        job_id, "info",
+                        f"📋 Detail prodi tersimpan: {prodi_saved_count}/{len(resolved)}",
+                        db,
+                    )
+                    await send_progress(job_id, {
+                        "phase": "prodi_detail",
+                        "current": i,
+                        "total": len(resolved),
+                        "saved": prodi_saved_count,
+                    })
+
+                if i % 10 == 0 or i <= 3 or i == len(resolved):
+                    await send_progress(job_id, {
+                        "phase": "prodi_detail",
+                        "current": i,
+                        "total": len(resolved),
+                        "saved": prodi_saved_count,
+                    })
+
+                    await db.execute(
+                        update(ScrapeJob).where(ScrapeJob.id == job_id).values(
+                            total_prodi_detail=prodi_saved_count,
+                            new_prodi_detail=prodi_saved_count,
+                        )
+                    )
+                    await db.commit()
+
+            await db.commit()
+            await send_log(
+                job_id, "success",
+                f"✅ STEP 2 selesai: {prodi_saved_count} detail prodi tersimpan",
+                db,
+            )
+
+            # STEP 3: Fetch dosen homebase
+            await send_log(
+                job_id, "info",
+                f"📚 STEP 3: Mengambil dosen dari {len(resolved)} prodi × {len(semesters)} semester...",
                 db
             )
 
@@ -512,12 +681,12 @@ async def run_scraping_job(
 
             await send_log(
                 job_id, "success",
-                f"✅ STEP 2 selesai: {len(all_dosen)} dosen unik ditemukan",
+                f"✅ STEP 3 selesai: {len(all_dosen)} dosen unik ditemukan",
                 db
             )
 
-            # STEP 3: Fetch profiles & save to DB
-            await send_log(job_id, "info", f"💾 STEP 3: Fetching profil & menyimpan ke database...", db)
+            # STEP 4: Fetch profiles & save to DB
+            await send_log(job_id, "info", f"💾 STEP 4: Fetching profil & menyimpan ke database...", db)
 
             saved_count = 0
             for i, dosen_data in enumerate(all_dosen, 1):
@@ -649,13 +818,15 @@ async def run_scraping_job(
                     total_dosen=saved_count,
                     new_dosen=saved_count,
                     skipped_dosen=skip_count,
+                    total_prodi_detail=prodi_saved_count,
+                    new_prodi_detail=prodi_saved_count,
                 )
             )
             await db.commit()
 
             await send_log(
                 job_id, "success",
-                f"🎉 Scraping selesai! {saved_count} dosen tersimpan ({elapsed})",
+                f"🎉 Scraping selesai! {saved_count} dosen + {prodi_saved_count} prodi tersimpan ({elapsed})",
                 db
             )
 
@@ -663,6 +834,7 @@ async def run_scraping_job(
             await broadcast_to_job(job_id, {
                 "type": "done",
                 "total_dosen": saved_count,
+                "total_prodi_detail": prodi_saved_count,
                 "new": saved_count,
                 "skipped": skip_count,
                 "elapsed": elapsed,

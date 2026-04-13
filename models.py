@@ -94,7 +94,12 @@ class PerguruanTinggi(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
+    kelompok = Column(String(50), nullable=True)       # e.g. PTKIN / NON PTKIN
+    pembina = Column(String(50), nullable=True)        # e.g. DIKTI / DIKTIS
+    status_pt = Column(String(50), nullable=True)      # e.g. PTN / PTS
+
     program_studi = relationship("ProgramStudi", back_populates="pt")
+    prodi_details = relationship("ProdiDetail", back_populates="pt")
     dosen = relationship("Dosen", back_populates="pt")
 
     __table_args__ = (
@@ -162,6 +167,42 @@ class Dosen(Base):
     )
 
 
+class ProdiDetail(Base):
+    """Scraped program studi detail — one row per prodi across all campuses."""
+    __tablename__ = "prodi_detail"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pddikti_id = Column(String(255), unique=True, nullable=True)
+    pt_id = Column(Integer, ForeignKey("perguruan_tinggi.id"), nullable=True)
+    nama_prodi = Column(String(255), nullable=False)
+    rumpun = Column(String(100), nullable=True)
+    jenjang = Column(String(10), nullable=True)
+    kode_prodi = Column(String(20), nullable=True)
+    jumlah_dosen = Column(Integer, default=0)
+    keterangan = Column(String(100), nullable=True)       # Aktif / Tidak Aktif
+    akreditasi = Column(String(100), nullable=True)       # Baik, Baik Sekali, Unggul, …
+    status_akreditasi = Column(String(100), nullable=True) # Belum Terakreditasi, dst
+    ptn_pts = Column(String(10), nullable=True)           # PTN / PTS
+    ptkin_non_ptkin = Column(String(20), nullable=True)   # PTKIN / NON PTKIN
+    dikti_diktis = Column(String(20), nullable=True)      # DIKTI / DIKTIS
+    provinsi = Column(String(100), nullable=True)
+    semester_terakhir = Column(String(10), nullable=True)  # e.g. 20251
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+    pt = relationship("PerguruanTinggi", back_populates="prodi_details")
+
+    __table_args__ = (
+        Index("idx_pd_nama", "nama_prodi"),
+        Index("idx_pd_rumpun", "rumpun"),
+        Index("idx_pd_jenjang", "jenjang"),
+        Index("idx_pd_akreditasi", "akreditasi"),
+        Index("idx_pd_ptn_pts", "ptn_pts"),
+        Index("idx_pd_ptkin", "ptkin_non_ptkin"),
+        Index("idx_pd_provinsi", "provinsi"),
+    )
+
+
 class ScrapeJob(Base):
     __tablename__ = "scrape_job"
 
@@ -177,6 +218,8 @@ class ScrapeJob(Base):
     total_dosen = Column(Integer, default=0)
     new_dosen = Column(Integer, default=0)
     skipped_dosen = Column(Integer, default=0)
+    total_prodi_detail = Column(Integer, default=0)
+    new_prodi_detail = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
     started_at = Column(TIMESTAMP, nullable=True)
     completed_at = Column(TIMESTAMP, nullable=True)

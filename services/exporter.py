@@ -117,3 +117,68 @@ def export_dosen_excel(dosen_list, pt_map: dict) -> io.BytesIO:
     wb.save(buffer)
     buffer.seek(0)
     return buffer
+
+
+def export_prodi_detail_excel(prodi_list, pt_map: dict) -> io.BytesIO:
+    """Export prodi detail list to Excel and return as BytesIO buffer."""
+    now_str = datetime.now().strftime("%d %B %Y, %H:%M WIB")
+    total = len(prodi_list)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Daftar Prodi"
+
+    cols = [
+        "No", "Nama Prodi", "Jenjang", "Perguruan Tinggi", "Jumlah Dosen",
+        "Keterangan", "Akreditasi Program Studi", "PTN/PTS",
+        "PTKIN/NON PTKIN", "DIKTI/DIKTIS", "Provinsi",
+        "Semester Laporan Terakhir",
+    ]
+    MC = len(cols)
+
+    # Title
+    ws.merge_cells(f"A1:{get_column_letter(MC)}1")
+    t = ws.cell(1, 1, "DAFTAR PROGRAM STUDI RUMPUN EKONOMI SYARIAH")
+    t.font = Font(name="Calibri", bold=True, color=COLOR_TITLE, size=14)
+    t.alignment = Alignment(horizontal="center", vertical="center")
+
+    ws.merge_cells(f"A2:{get_column_letter(MC)}2")
+    s = ws.cell(2, 1, f"Sumber: PDDikti API — {now_str}")
+    s.font = Font(italic=True, color="666666", size=9)
+    s.alignment = Alignment(horizontal="center")
+
+    ws.merge_cells(f"A3:{get_column_letter(MC)}3")
+    ws.cell(3, 1, f"Total Program Studi: {total:,}").font = Font(bold=True, size=10)
+    ws.cell(3, 1).alignment = Alignment(horizontal="center")
+
+    # Header
+    HR = 5
+    for c, h in enumerate(cols, 1):
+        ws.cell(HR, c, h)
+    _style_header(ws, HR, MC)
+
+    # Data rows
+    for i, p in enumerate(prodi_list, 1):
+        r = HR + i
+        ws.cell(r, 1, i)
+        ws.cell(r, 2, p.nama_prodi or "")
+        ws.cell(r, 3, p.jenjang or "")
+        ws.cell(r, 4, pt_map.get(p.pt_id, ""))
+        ws.cell(r, 5, p.jumlah_dosen or 0)
+        ws.cell(r, 6, p.keterangan or "")
+        ws.cell(r, 7, p.akreditasi or "")
+        ws.cell(r, 8, p.ptn_pts or "")
+        ws.cell(r, 9, p.ptkin_non_ptkin or "")
+        ws.cell(r, 10, p.dikti_diktis or "")
+        ws.cell(r, 11, p.provinsi or "")
+        ws.cell(r, 12, p.semester_terakhir or "")
+
+    _style_rows(ws, HR + 1, HR + total, MC)
+    _auto_width(ws, MC)
+    ws.freeze_panes = "B6"
+    ws.row_dimensions[1].height = 30
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
