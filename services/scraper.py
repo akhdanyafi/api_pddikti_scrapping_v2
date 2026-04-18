@@ -139,6 +139,8 @@ PRODI_NORMALIZATION = {
     # ZAKAT DAN WAKAF
     "ZAKAT DAN WAKAF": "ZAKAT DAN WAKAF",
     "ZAKAT WAKAF": "ZAKAT DAN WAKAF",
+    "ZAKAT & WAKAF": "ZAKAT DAN WAKAF",
+    "ZAKAT WAKAF": "ZAKAT DAN WAKAF",
     # EKONOMI ISLAM (standalone)
     "EKONOMI ISLAM": "EKONOMI ISLAM",
     # EKONOMI SYARIAH (standalone — placed last so longer keys match first)
