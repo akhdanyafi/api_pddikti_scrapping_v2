@@ -68,14 +68,14 @@ def export_dosen_excel(dosen_list, pt_map: dict) -> io.BytesIO:
 
     cols = [
         "No", "Nama", "NIDN", "Perguruan Tinggi", "Jabatan Fungsional",
-        "Status Ikatan Kerja", "Jenis Kelamin", "Rumpun Prodi",
+        "Status Ikatan Kerja", "Jenis Kelamin", "Program Studi",
         "Pendidikan Terakhir", "Status Aktivitas"
     ]
     MC = len(cols)
 
     # Title
     ws.merge_cells(f"A1:{get_column_letter(MC)}1")
-    t = ws.cell(1, 1, "DATA DOSEN PROGRAM STUDI RUMPUN EKONOMI SYARIAH")
+    t = ws.cell(1, 1, "DATA DOSEN PROGRAM STUDI EKONOMI SYARIAH")
     t.font = Font(name="Calibri", bold=True, color=COLOR_TITLE, size=14)
     t.alignment = Alignment(horizontal="center", vertical="center")
 
@@ -85,7 +85,7 @@ def export_dosen_excel(dosen_list, pt_map: dict) -> io.BytesIO:
     s.alignment = Alignment(horizontal="center")
 
     ws.merge_cells(f"A3:{get_column_letter(MC)}3")
-    ws.cell(3, 1, f"Total Dosen: {total:,} | Rumpun Ekonomi Syariah").font = Font(bold=True, size=10)
+    ws.cell(3, 1, f"Total Dosen: {total:,} | Program Studi Ekonomi Syariah").font = Font(bold=True, size=10)
     ws.cell(3, 1).alignment = Alignment(horizontal="center")
 
     # Header
@@ -138,7 +138,7 @@ def export_prodi_detail_excel(prodi_list, pt_map: dict) -> io.BytesIO:
 
     # Title
     ws.merge_cells(f"A1:{get_column_letter(MC)}1")
-    t = ws.cell(1, 1, "DAFTAR PROGRAM STUDI RUMPUN EKONOMI SYARIAH")
+    t = ws.cell(1, 1, "DAFTAR PROGRAM STUDI EKONOMI SYARIAH")
     t.font = Font(name="Calibri", bold=True, color=COLOR_TITLE, size=14)
     t.alignment = Alignment(horizontal="center", vertical="center")
 

@@ -17,6 +17,7 @@ from auth import create_default_admin
 from routers.auth_router import router as auth_router
 from routers.admin_router import router as admin_router
 from routers.dosen_router import router as dosen_router
+from routers.prodi_router import router as prodi_router
 from routers.scrape_router import router as scrape_router
 from routers.stats_router import router as stats_router
 
@@ -141,6 +142,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(dosen_router)
+app.include_router(prodi_router)
 app.include_router(scrape_router)
 app.include_router(stats_router)
 

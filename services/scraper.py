@@ -319,7 +319,7 @@ async def run_scraping_job(
 
     async with AsyncSessionLocal() as db:
         try:
-            await send_log(job_id, "info", f"🚀 Memulai scraping untuk {len(prodi_filter)} rumpun prodi...", db)
+            await send_log(job_id, "info", f"🚀 Memulai scraping untuk {len(prodi_filter)} program studi...", db)
 
             # STEP 1: Nationwide discovery prodi IDs per selected rumpun
             await send_log(job_id, "info", "🌏 STEP 1: Discovery prodi nasional dari API PDDikti...", db)
@@ -333,7 +333,7 @@ async def run_scraping_job(
                 await send_log(
                     job_id,
                     "info",
-                    f"🔎 [{rumpun_index}/{len(prodi_filter)}] Discovery rumpun '{rumpun}' "
+                    f"🔎 [{rumpun_index}/{len(prodi_filter)}] Discovery program studi '{rumpun}' "
                     f"dengan {len(queries)} kata kunci",
                     db,
                 )
@@ -389,7 +389,7 @@ async def run_scraping_job(
                 await send_log(
                     job_id,
                     "info",
-                    f"✅ Rumpun '{rumpun}': {discovered} prodi berhasil ditemukan",
+                    f"✅ Program Studi '{rumpun}': {discovered} prodi berhasil ditemukan",
                     db,
                 )
 
